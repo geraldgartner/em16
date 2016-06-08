@@ -61,12 +61,11 @@ geom_point(alpha=1/4) +
 plot(erfahrung)
 ggsave("erfahrung.pdf", useDingbats=FALSE)
 
-summary(lm(spielerdaten$einsatzquote ~ spielerdaten$laenderspiele))
+summary(lm(spielerdaten$einsatzquote + spielerdaten$laenderspiele ~ spielerdaten$q ))
 
 
 test <- glm(spielerdaten$einsatzquote ~ spielerdaten$q, family = binomial)
 print(test)
-quali <- as.numeric(spielerdaten$q)
-einsatzdichte <- spielerdaten$einsatzquote*100
-cor(quali, einsatzdichte, use="pairwise.complete.obs")
+
+
 
