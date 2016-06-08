@@ -10,6 +10,7 @@ library(formatR)
 library(scales)
 library(grid)
 library(lubridate)
+library(reshape2)
 
 #dStd.at-Style
 theme <- theme(plot.background = element_rect(fill = "gray97"), panel.grid.major = element_line(colour = "gray86", linetype = "dotted"), 
@@ -42,9 +43,8 @@ spielerdaten$age <- round((today-spielerdaten$gebdat)/365.25, digits = 1)
 spielerdaten$age(start = gebdat, end = today) / 
   duration(num = 1, units = "years")
 
-spielerdaten$einsatzquote <- spielerdaten$minutesplayed / 1080
+spielerdaten$einsatzquote <- as.numeric(spielerdaten$minutesplayed) / 1080
 spielerdaten$torquote <- spielerdaten$tore / spielerdaten$minutesplayed
-
 
 
 # Plotting: Sagt die Erfahrenheit der Spieler den Aufstieg voraus?
@@ -67,5 +67,27 @@ summary(lm(spielerdaten$einsatzquote + spielerdaten$laenderspiele ~ spielerdaten
 test <- glm(spielerdaten$einsatzquote ~ spielerdaten$q, family = binomial)
 print(test)
 
+#Beste Torjäger
+spielerdaten$torquote <- spielerdaten$tore/spielerdaten$matchesplayed
+toremehrals0 <- subset(spielerdaten, tore>0)
+torquotemehrals0 <- subset(spielerdaten, torquote>0)
+torjäger <- data.frame(toremehrals0, torquotemehrals0)
 
+torjägerplot <- ggplot(toremehrals0, aes(x=torquote, y=tore, colour=q)) +
+  geom_point(alpha=1/4) + 
+  labs(x = "Tore pro 90 Minuten", y = "Anzahl der Tore in der EM-Quali") +
+  ggtitle("Je erfahrener die Teamspieler, \ndesto wahrscheinlicher die EM-Quali") +
+  guides(fill=FALSE) +
+  scale_x_log10() +
+  scale_y_continuous() +
+  scale_colour_manual(values = c("nq"="#7A8FCC", "q"="#548750")) +
+  theme(strip.text.x = element_text(size=12), strip.background = element_rect(colour="grey86", linetype = "dotted", fill="grey97"),legend.position="none") +
+  theme +
+  geom_text(data=subset(toremehrals0, tore > 8),
+            aes(torquote,tore,label=spieler))
+plot(torjägerplot)
+ggsave("torjäger.pdf", useDingbats=FALSE)
 
+ggplot(spielerdaten, aes(x=spielerdaten[torquote>"0"],
+               y=spielerdaten[tore>"0"],
+               colour=q))
