@@ -31,6 +31,7 @@ theme <- theme(plot.background = element_rect(fill = "gray97"), panel.grid.major
 
 spielerdaten <- read.csv("~/Google Drive/dStd.at/em16/rskripte/performanceanalysis/spielerdaten.csv")
 marktwerte <- read.csv("~/Google Drive/dStd.at/em16/rskripte/performanceanalysis/marktwerte.csv")
+punkteemquali <- read.csv("~/Google Drive/dStd.at/em16/rskripte/performanceanalysis/punkteemquali.csv")
 
 #tidying! all NAs to 0
 spielerdaten[is.na(spielerdaten)] <- 0
@@ -113,30 +114,54 @@ top11spielerrefined <- top13[order(top13$einsatzquote,decreasing=T),]
 
 
 #Berechne Durchschnittsalter für die 11 am häufigsten aufgestellten
-durchschnittsalter <- aggregate(age~land, top11spieler, mean )
+#durchschnittsalter <- aggregate(age~land, top11spieler, mean ) - war noch aus dem ersten Versuch junge oder ältere Teams, die eingespielt oder nicht sind, zu finden
+punkteinquali
+
 
 #Merge dfs
-sicherste11 <- merge(durchschnittsalter, top11spielerrefined, by.x = "land", by.y = "land")
+sicherste11 <- merge(punkteemquali, top11spielerrefined, by.x = "land", by.y = "land")
 sicherste12 <- merge(x = sicherste11, y = spielerdaten[ , c("land", "q")], by = "land")
 sicherste13 <- unique(sicherste12)
 
-sicherste13plot <- ggplot(sicherste13, aes(x=age, y=einsatzquote, colour=q)) +
+sicherste13plot <- ggplot(sicherste13, aes(x=pkt, y=einsatzquote, colour=q)) +
   geom_point(alpha=1, aes(size = einsatzquote)) +
   scale_size_area(sicherste11, max_size = 3) +
   scale_y_continuous(labels = percent) +
   scale_x_continuous() +
+  geom_smooth(method=lm)+
   scale_fill_continuous(guide = "legend") +
   scale_colour_manual(values = c("nq"="#CC7F7A", "q"="#7AAB89")) +
-  geom_text(data=subset(sicherste13, einsatzquote > 0.0),
-            aes(age,einsatzquote,label=land)) +
+  geom_text_repel(data=subset(sicherste13, einsatzquote > 0.0),
+            aes(pkt,einsatzquote,label=land)) +
   coord_flip()+
-  labs(x = "Durchschnittsalter der Spieler in der Mannschaft", y = "Einsatzquote aller Spieler") +
-  ggtitle("Wales & Belgien: Junge \nerfolgshungrige Teams") +
+  labs(x = "Punkte der Mannschaft", y = "Einsatzquote aller Spieler") +
+  ggtitle("Österreich: Mit Stammelf zur Qualifikation") +
   theme(strip.text.x = element_text(size=12), strip.background = element_rect(colour="grey86", linetype = "dotted", fill="grey97"),legend.position="none") +
   theme
 plot(sicherste13plot)
 ggsave("sicherste13plot_confidence.pdf", useDingbats=FALSE)
 
+###################################################################################################
+###################################################################################################
+#Passsichere Elf als Qualifikationsmitgrund? Nein
+
+spielerdaten$passerfolg <- spielerdaten$passescomplete/spielerdaten$passes
+spielerdatenpkt <- merge(x = spielerdaten, y = punkteemquali, by = "land")
+
+passerfolg <- ggplot(spielerdatenpkt, aes(x=passerfolg, y=einsatzquote, colour=q)) +
+  geom_point(alpha=1/3, aes(size = passerfolg)) +
+  scale_size_area(spielerdatenpkt, max_size = 3) +
+  geom_smooth(method=lm, aes(weight=passerfolg))  +
+  scale_x_continuous(labels = percent, limits = c(0.5, 1)) +
+  scale_y_continuous(labels = percent, limits = c(0.5, 1)) +
+  scale_fill_continuous(guide = "legend") +
+  labs(x = "Passerfolgsquote in der EM-Qualifikation", y = "Einsatzquote in der Quali") +
+  ggtitle("Sicher am Ball,\nsicher in Frankreich") +
+  scale_colour_manual(values = c("nq"="#CC7F7A", "q"="#7AAB89")) +
+  theme(strip.text.x = element_text(size=12), strip.background = element_rect(colour="grey86", linetype = "dotted", fill="grey97"),legend.position="none") +
+  theme 
+plot(passerfolg)
+ggsave("passerfolg.pdf", useDingbats=FALSE)
 
 
 ###################################################################################################
@@ -165,3 +190,30 @@ knipserplot <- ggplot(knipserdata, aes(x=torschussquote.x*15, y=tore, colour=q))
             aes(torschussquote.x,tore,label=spieler))
 plot(knipserplot)
 ggsave("knipserplot.pdf", useDingbats=FALSE)
+
+###################################################################################################
+###################################################################################################
+
+#Wer oft aufs Tor schießt, dem gelingt die Qualifikation?
+
+spielerdaten$torschussquotealle <- ((as.numeric(spielerdaten$attemptsblocked)+as.numeric(spielerdaten$attemptsontarget) + as.numeric(spielerdaten$attemptsofftarget)) / spielerdaten$minutesplayed)*15
+spielerdaten <- merge(x = spielerdaten, y = punkteemquali[ , c("land", "pkt")], by = "land")
+mehrsq <- subset(spielerdaten, (pos=="Angriff" | pos=="Mittelfeld") &  einsatzquote>0.33)
+
+
+mehrschuessequali <- ggplot(mehrsq, aes(x=passerfolg, y=torschussquotealle, colour=q)) +
+  geom_point(alpha=1, aes(size = torschussquotealle)) +
+  scale_size_area(mehrsq, max_size = 3) +
+  scale_y_continuous(limits = c(0,1.0)) +
+  scale_x_continuous(limits = c(0.6,1)) +
+  geom_smooth(method=lm, level =0.80)+
+  scale_fill_continuous(guide = "legend") +
+  scale_colour_manual(values = c("nq"="#CC7F7A", "q"="#7AAB89")) +
+  labs(x = "Passquote des Spielers", y = "Torschüsse pro 15 Minuten") +
+  geom_text_repel(data=subset(mehrsq, torschussquotealle > 0.8), aes(label=spieler))+
+  ggtitle("Mehr Schüsse, höhere Pass-Sicherheit:\nBessere Qualifikationschancen") +
+  theme(strip.text.x = element_text(size=12), strip.background = element_rect(colour="grey86", linetype = "dotted", fill="grey97"),legend.position="none") +
+  theme
+
+plot(mehrschuessequali)
+ggsave("mehrschuessequali_confidence.pdf", useDingbats=FALSE)
